@@ -7,6 +7,8 @@
     <title>简易记账 - 暗黑主题</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -58,6 +60,56 @@
         .date-display {
             font-size: 12px;
             color: #6b7280;
+        }
+
+        /* 用户信息栏 */
+        .user-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1, #a78bfa);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .user-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #e5e7eb;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 8px;
+            color: #f87171;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
         }
 
         /* 蓝色余额卡片 */
@@ -619,6 +671,15 @@
             <span class="date-display" id="currentDate"></span>
         </header>
 
+        <!-- 用户信息栏 -->
+        <div class="user-bar">
+            <div class="user-info">
+                <div class="user-avatar" id="userAvatar">👤</div>
+                <span class="user-name" id="userName">加载中...</span>
+            </div>
+            <button class="logout-btn" id="logoutBtn">退出登录</button>
+        </div>
+
         <!-- 蓝色余额卡片 -->
         <div class="balance-card">
             <div class="balance-header">
@@ -733,6 +794,21 @@
     <div class="glow-effect"></div>
 
     <script>
+        // ==================== Supabase 配置 ====================
+        const SUPABASE_URL = 'https://iggizydrjexfdqalcumo.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlnZ2l6eWRyamV4ZmRxYWxjdW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NjA5NDMsImV4cCI6MjA4NTMzNjk0M30.kwbQs_2DKOb7WowapFHHEVuvqdgDowBwgtJH6lPUX_k';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // ==================== 登录状态检查 ====================
+        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (!currentUser) {
+            // 未登录，跳转到登录页
+            window.location.href = 'login.html';
+        }
+        const userId = currentUser ? currentUser.id : null;
+
+        // ==================== 工具函数 ====================
         // 格式化数字，添加千位分隔符
         function formatNumber(num, decimals = 0) {
             const n = typeof num === 'string' ? parseFloat(num) : num;
@@ -778,17 +854,117 @@
             return `${dateStr} ${timeStr} · ${category}`;
         }
 
-        // 预算配置
+        // ==================== 预算配置 ====================
         const BUDGETS = {
             '餐饮': 2500,
             '交通': 1000,
             '购物': 3000
         };
 
-        // 数据
-        let transactions = JSON.parse(localStorage.getItem('transactions_dark')) || [];
+        // ==================== 数据状态 ====================
+        let transactions = [];
         let currentType = 'expense';
         let currentCategory = '餐饮';
+        let isLoading = false;
+
+        // ==================== Supabase 数据操作 ====================
+        // 从 Supabase 加载交易记录
+        async function loadTransactions() {
+            isLoading = true;
+            try {
+                const { data, error } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                transactions = data.map(t => ({
+                    id: t.id,
+                    type: t.type,
+                    category: t.category,
+                    desc: t.description || t.category,
+                    amount: parseFloat(t.amount),
+                    timestamp: new Date(t.created_at).getTime()
+                }));
+                render();
+            } catch (error) {
+                console.error('加载数据失败:', error);
+                // 如果云端加载失败，尝试从本地恢复
+                transactions = JSON.parse(localStorage.getItem('transactions_dark') || '[]');
+                render();
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        // 保存单条记录到 Supabase
+        async function saveTransaction(transaction) {
+            try {
+                const { data, error } = await supabase.from('transactions').insert({
+                    type: transaction.type,
+                    category: transaction.category,
+                    description: transaction.desc,
+                    amount: transaction.amount,
+                    user_id: userId
+                }).select().single();
+
+                if (error) throw error;
+                return data;
+            } catch (error) {
+                console.error('保存失败:', error);
+                // 保存到本地作为备份
+                const localData = JSON.parse(localStorage.getItem('transactions_dark') || '[]');
+                localData.unshift(transaction);
+                localStorage.setItem('transactions_dark', JSON.stringify(localData));
+                return null;
+            }
+        }
+
+        // 从 Supabase 删除记录
+        async function deleteTransaction(id) {
+            try {
+                const { error } = await supabase
+                    .from('transactions')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+                return true;
+            } catch (error) {
+                console.error('删除失败:', error);
+                return false;
+            }
+        }
+
+        // 迁移本地数据到云端（首次使用时调用）
+        async function migrateLocalData() {
+            const localData = JSON.parse(localStorage.getItem('transactions_dark') || '[]');
+            if (localData.length === 0) return;
+
+            console.log('正在迁移本地数据到云端...');
+            try {
+                const records = localData.map(t => ({
+                    type: t.type,
+                    category: t.category,
+                    description: t.desc,
+                    amount: t.amount,
+                    user_id: userId,
+                    created_at: new Date(t.timestamp || t.id).toISOString()
+                }));
+
+                const { error } = await supabase.from('transactions').insert(records);
+                if (error) throw error;
+
+                // 迁移成功后清除本地数据
+                localStorage.removeItem('transactions_dark');
+                console.log('数据迁移完成！');
+                await loadTransactions();
+            } catch (error) {
+                console.error('数据迁移失败:', error);
+            }
+        }
 
         // 元素
         const balanceEl = document.getElementById('balance');
@@ -817,6 +993,25 @@
         monthLabel.textContent = now.toLocaleDateString('zh-CN', {
             year: 'numeric',
             month: 'long'
+        });
+
+        // ==================== 用户信息显示 ====================
+        const userNameEl = document.getElementById('userName');
+        const userAvatarEl = document.getElementById('userAvatar');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        if (currentUser) {
+            userNameEl.textContent = currentUser.username;
+            // 显示用户名首字作为头像
+            userAvatarEl.textContent = currentUser.username.charAt(0).toUpperCase();
+        }
+
+        // 退出登录
+        logoutBtn.addEventListener('click', () => {
+            if (confirm('确定要退出登录吗？')) {
+                localStorage.removeItem('currentUser');
+                window.location.href = 'login.html';
+            }
         });
 
         // 抽屉控制
@@ -859,7 +1054,7 @@
         addBtn.addEventListener('click', add);
         amountInput.addEventListener('keypress', e => e.key === 'Enter' && add());
 
-        function add() {
+        async function add() {
             const desc = descInput.value.trim() || currentCategory;
             const amount = parseFloat(amountInput.value);
 
@@ -869,33 +1064,39 @@
                 return;
             }
 
-            transactions.unshift({
+            const newTx = {
                 id: Date.now(),
                 type: currentType,
                 category: currentType === 'expense' ? currentCategory : '收入',
                 desc,
                 amount,
-                timestamp: Date.now()  // 保存完整时间戳
-            });
+                timestamp: Date.now()
+            };
 
-            save();
+            // 先更新本地UI，再保存到云端
+            transactions.unshift(newTx);
             render();
             descInput.value = '';
             amountInput.value = '';
             closeDrawer();
+
+            // 异步保存到 Supabase
+            const saved = await saveTransaction(newTx);
+            if (saved) {
+                // 更新本地记录的 ID 为云端生成的 ID
+                newTx.id = saved.id;
+            }
         }
 
-        // 删除
-        window.del = function (id) {
+        // 删除记录
+        window.del = async function (id) {
+            // 先从本地移除
             transactions = transactions.filter(t => t.id !== id);
-            save();
             render();
-        };
 
-        // 保存
-        function save() {
-            localStorage.setItem('transactions_dark', JSON.stringify(transactions));
-        }
+            // 异步从云端删除
+            await deleteTransaction(id);
+        };
 
         // 渲染
         function render() {
@@ -996,8 +1197,13 @@
             return '';
         }
 
-        // 初始化
-        render();
+        // 初始化：加载云端数据
+        loadTransactions();
+
+        // 检查是否需要迁移本地数据
+        if (localStorage.getItem('transactions_dark')) {
+            migrateLocalData();
+        }
 
         // 抖动动画
         const style = document.createElement('style');
