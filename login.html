@@ -281,7 +281,7 @@
         const SUPABASE_URL = 'https://iggizydrjexfdqalcumo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlnZ2l6eWRyamV4ZmRxYWxjdW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NjA5NDMsImV4cCI6MjA4NTMzNjk0M30.kwbQs_2DKOb7WowapFHHEVuvqdgDowBwgtJH6lPUX_k';
 
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // ==================== 检查登录状态 ====================
         const currentUser = localStorage.getItem('currentUser');
@@ -353,7 +353,7 @@
 
             try {
                 // 检查用户名是否已存在
-                const { data: existing } = await supabase
+                const { data: existing } = await supabaseClient
                     .from('users')
                     .select('id')
                     .eq('username', username)
@@ -366,7 +366,7 @@
 
                 // 创建用户
                 const passwordHash = await hashPassword(password);
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('users')
                     .insert({ username, password_hash: passwordHash })
                     .select()
@@ -409,7 +409,7 @@
             try {
                 const passwordHash = await hashPassword(password);
 
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('users')
                     .select('*')
                     .eq('username', username)

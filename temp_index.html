@@ -798,7 +798,7 @@
         const SUPABASE_URL = 'https://iggizydrjexfdqalcumo.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlnZ2l6eWRyamV4ZmRxYWxjdW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NjA5NDMsImV4cCI6MjA4NTMzNjk0M30.kwbQs_2DKOb7WowapFHHEVuvqdgDowBwgtJH6lPUX_k';
 
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // ==================== 登录状态检查 ====================
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
@@ -872,7 +872,7 @@
         async function loadTransactions() {
             isLoading = true;
             try {
-                const { data, error } = await supabaseClient
+                const { data, error } = await supabase
                     .from('transactions')
                     .select('*')
                     .eq('user_id', userId)
@@ -902,7 +902,7 @@
         // 保存单条记录到 Supabase
         async function saveTransaction(transaction) {
             try {
-                const { data, error } = await supabaseClient.from('transactions').insert({
+                const { data, error } = await supabase.from('transactions').insert({
                     type: transaction.type,
                     category: transaction.category,
                     description: transaction.desc,
@@ -925,7 +925,7 @@
         // 从 Supabase 删除记录
         async function deleteTransaction(id) {
             try {
-                const { error } = await supabaseClient
+                const { error } = await supabase
                     .from('transactions')
                     .delete()
                     .eq('id', id);
@@ -954,7 +954,7 @@
                     created_at: new Date(t.timestamp || t.id).toISOString()
                 }));
 
-                const { error } = await supabaseClient.from('transactions').insert(records);
+                const { error } = await supabase.from('transactions').insert(records);
                 if (error) throw error;
 
                 // 迁移成功后清除本地数据
