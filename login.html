@@ -237,6 +237,10 @@
             <button class="tab-btn" data-tab="register">注册</button>
         </div>
 
+        <div style="text-align: center; margin-bottom: 20px;">
+            <a href="index.html" style="color: #6b7280; font-size: 13px; text-decoration: none;">← 返回主页</a>
+        </div>
+
         <div id="message" class="message"></div>
 
         <div class="form-container">
@@ -296,22 +300,37 @@
         const messageEl = document.getElementById('message');
 
         // ==================== 标签切换 ====================
-        tabBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                tabBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-
-                const tab = btn.dataset.tab;
-                if (tab === 'login') {
-                    loginForm.classList.add('active');
-                    registerForm.classList.remove('active');
+        function switchTab(tab) {
+            tabBtns.forEach(btn => {
+                if (btn.dataset.tab === tab) {
+                    btn.classList.add('active');
                 } else {
-                    registerForm.classList.add('active');
-                    loginForm.classList.remove('active');
+                    btn.classList.remove('active');
                 }
-                hideMessage();
             });
+
+            if (tab === 'login') {
+                loginForm.classList.add('active');
+                registerForm.classList.remove('active');
+            } else {
+                registerForm.classList.add('active');
+                loginForm.classList.remove('active');
+            }
+            hideMessage();
+        }
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
         });
+
+        // 检查 URL 参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialTab = urlParams.get('tab');
+        if (initialTab === 'register') {
+            switchTab('register');
+        } else {
+            switchTab('login');
+        }
 
         // ==================== 消息显示 ====================
         function showMessage(text, type = 'error') {

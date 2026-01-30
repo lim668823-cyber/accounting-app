@@ -91,6 +91,26 @@
             font-family: inherit;
         }
 
+        .auth-links {
+            display: flex;
+            gap: 12px;
+        }
+
+        .nav-btn {
+            text-decoration: none;
+            padding: 8px 16px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 8px;
+            color: #818cf8;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
         .logout-btn:hover {
             background: rgba(239, 68, 68, 0.2);
         }
@@ -656,7 +676,11 @@
 
         <!-- 用户信息栏 -->
         <div class="user-bar">
-            <button class="logout-btn" id="logoutBtn">退出登录</button>
+            <div id="authLinks" class="auth-links">
+                <a href="login.html?tab=login" class="nav-btn">登录</a>
+                <a href="login.html?tab=register" class="nav-btn">注册</a>
+            </div>
+            <button class="logout-btn" id="logoutBtn" style="display: none;">退出登录</button>
         </div>
 
         <!-- 蓝色余额卡片 -->
@@ -781,11 +805,12 @@
 
         // ==================== 登录状态检查 ====================
         const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-        if (!currentUser) {
-            // 未登录，跳转到登录页
-            window.location.href = 'login.html';
-        }
         const userId = currentUser ? currentUser.id : null;
+
+        // 如果未登录，初始化为空状态
+        if (!currentUser) {
+            console.log('未登录，显示访客模式');
+        }
 
         // ==================== 工具函数 ====================
         // 格式化数字，添加千位分隔符
@@ -849,6 +874,10 @@
         // ==================== Supabase 数据操作 ====================
         // 从 Supabase 加载交易记录
         async function loadTransactions() {
+            if (!userId) {
+                render(); // 显示空列表
+                return;
+            }
             isLoading = true;
             try {
                 const { data, error } = await supabaseClient
@@ -974,13 +1003,23 @@
             month: 'long'
         });
 
-        // ==================== 退出登录 ====================
+        // ==================== 导航与登录处理 ====================
         const logoutBtn = document.getElementById('logoutBtn');
+        const authLinks = document.getElementById('authLinks');
+
+        if (currentUser) {
+            if (logoutBtn) logoutBtn.style.display = 'block';
+            if (authLinks) authLinks.style.display = 'none';
+        } else {
+            if (logoutBtn) logoutBtn.style.display = 'none';
+            if (authLinks) authLinks.style.display = 'flex';
+        }
+
         if (logoutBtn) {
             logoutBtn.addEventListener('click', () => {
                 if (confirm('确定要退出登录吗？')) {
                     localStorage.removeItem('currentUser');
-                    window.location.href = 'login.html';
+                    window.location.reload(); // 刷新当前页面回到游客状态
                 }
             });
         }
